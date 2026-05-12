@@ -35,6 +35,13 @@ logging.basicConfig(level=logging.WARNING)
 
 from binance_fix_connector_async.utils import get_api_key, get_private_key
 
+BENCHMARK_WARMUP_RUNS = 1
+BENCHMARK_REPEATS = 7
+MESSAGE_CREATION_ITERATIONS = 10_000
+LATENCY_ITERATIONS = 1_000
+MEMORY_CONNECTOR_COUNT = 50
+MEMORY_MESSAGES_PER_CONNECTOR = 10
+
 
 @dataclass
 class TestResult:
@@ -46,6 +53,7 @@ class TestResult:
     expected: Optional[Union[float, int, str]] = None
     message: str = ""
     duration: float = 0.0
+    details: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -221,29 +229,48 @@ class LibraryAnalyzer:
         unit: str,
         higher_is_better: bool = True,
     ) -> None:
-        """Run a benchmark for async (and optionally sync), append a TestResult."""
-        async_val = bench_fn("async")
+        """Run repeated benchmark samples for async and sync libraries."""
+        async_samples, sync_samples = self._paired_benchmark_samples(bench_fn)
+        async_stats = self._sample_stats(async_samples)
+
         if self.sync_lib:
-            sync_val = bench_fn("sync")
-            base = sync_val if higher_is_better else async_val
+            sync_stats = self._sample_stats(sync_samples)
+            async_val = async_stats["median"]
+            sync_val = sync_stats["median"]
+            base = sync_val
             diff_val = async_val - sync_val if higher_is_better else sync_val - async_val
             pct = (diff_val / base) * 100 if base > 0 else 0
-            label = "faster" if higher_is_better else "more efficient"
+            positive_label, negative_label = self._comparison_labels(name, higher_is_better)
+            label = positive_label if pct >= 0 else negative_label
             self.results.performance.append(
                 TestResult(
                     name=name,
-                    status="PASS" if async_val > 0 else "FAIL",
-                    value=f"{async_val:{fmt}}{unit} (async) vs {sync_val:{fmt}}{unit} (sync)",
-                    message=f"{pct:+.1f}% {label} (async)" if pct >= 0 else f"{-pct:+.1f}% slower (async)",
+                    status="PASS" if async_val > 0 and sync_val > 0 else "FAIL",
+                    value=(f"median {async_val:{fmt}}{unit} (async) vs " f"{sync_val:{fmt}}{unit} (sync)"),
+                    message=f"{abs(pct):.1f}% {label} (async median), {BENCHMARK_REPEATS} repeats",
+                    details={
+                        "async": async_stats,
+                        "sync": sync_stats,
+                        "fmt": fmt,
+                        "unit": unit,
+                        "higher_is_better": higher_is_better,
+                        "pct": pct,
+                    },
                 )
             )
         else:
             self.results.performance.append(
                 TestResult(
                     name=name,
-                    status="PASS",
-                    value=f"{async_val:{fmt}}{unit} (async only)",
-                    message="Sync library not available for comparison",
+                    status="PASS" if async_stats["median"] > 0 else "FAIL",
+                    value=f"median {async_stats['median']:{fmt}}{unit} (async only)",
+                    message=f"Sync library not available; {BENCHMARK_REPEATS} async repeats",
+                    details={
+                        "async": async_stats,
+                        "fmt": fmt,
+                        "unit": unit,
+                        "higher_is_better": higher_is_better,
+                    },
                 )
             )
 
@@ -370,11 +397,10 @@ class LibraryAnalyzer:
         """Generate comprehensive analysis report."""
         print("\n📊 Generating Analysis Report...")
 
-        # Calculate summary statistics
-        report_categories = ["performance", "consistency", "feature_parity", "exchange_operations"]
-        runnable_rates = [
+        correctness_categories = ["consistency", "feature_parity", "exchange_operations"]
+        correctness_rates = [
             self.results.get_pass_rate(category)
-            for category in report_categories
+            for category in correctness_categories
             if self.results.has_runnable_tests(category)
         ]
 
@@ -383,7 +409,8 @@ class LibraryAnalyzer:
             "consistency_pass_rate": self.results.get_pass_rate("consistency"),
             "feature_parity_pass_rate": self.results.get_pass_rate("feature_parity"),
             "exchange_operations_pass_rate": self.results.get_pass_rate("exchange_operations"),
-            "overall_pass_rate": sum(runnable_rates) / len(runnable_rates) if runnable_rates else 0.0,
+            "overall_pass_rate": sum(correctness_rates) / len(correctness_rates) if correctness_rates else 0.0,
+            "correctness_pass_rate": sum(correctness_rates) / len(correctness_rates) if correctness_rates else 0.0,
             "sync_available": self.results.library_status.get("sync", False),
             "async_available": self.results.library_status.get("async", False),
             "total_tests": len(
@@ -416,7 +443,7 @@ class LibraryAnalyzer:
 
         total_time = time.time() - start_time
         print(f"\n🎉 Analysis completed in {total_time:.1f} seconds")
-        print(f"📈 Overall pass rate: {self.results.summary['overall_pass_rate']:.1f}%")
+        print(f"📈 Correctness pass rate: {self.results.summary['correctness_pass_rate']:.1f}%")
 
         # Show credential status
         if self.test_credentials.get("is_real_testnet", False):
@@ -455,6 +482,45 @@ class LibraryAnalyzer:
             return 0.0
         return asyncio.run(test_fn(lib, library_type.capitalize()))
 
+    def _paired_benchmark_samples(self, bench_fn) -> tuple[list[float], list[float]]:
+        async_samples: list[float] = []
+        sync_samples: list[float] = []
+        total_runs = BENCHMARK_WARMUP_RUNS + BENCHMARK_REPEATS
+        for run_index in range(total_runs):
+            order = ("async", "sync") if run_index % 2 == 0 else ("sync", "async")
+            for library_type in order:
+                if library_type == "sync" and not self.sync_lib:
+                    continue
+                sample = bench_fn(library_type)
+                if run_index < BENCHMARK_WARMUP_RUNS:
+                    continue
+                if library_type == "async":
+                    async_samples.append(sample)
+                else:
+                    sync_samples.append(sample)
+        return async_samples, sync_samples
+
+    @staticmethod
+    def _sample_stats(samples: list[float]) -> dict[str, float]:
+        if not samples:
+            return {"median": 0.0, "min": 0.0, "max": 0.0, "mean": 0.0}
+        return {
+            "median": statistics.median(samples),
+            "min": min(samples),
+            "max": max(samples),
+            "mean": statistics.mean(samples),
+        }
+
+    @staticmethod
+    def _comparison_labels(name: str, higher_is_better: bool) -> tuple[str, str]:
+        if higher_is_better or "Latency" in name:
+            return "faster", "slower"
+        return "more efficient", "less efficient"
+
+    @staticmethod
+    def _format_metric(value: float, fmt: str, unit: str) -> str:
+        return f"{value:{fmt}}{unit}"
+
     def _benchmark_message_creation(self, library_type: str) -> float:
         """Benchmark real FIX message creation speed using actual libraries."""
         return self._run_benchmark(library_type, self._message_creation_test)
@@ -463,7 +529,7 @@ class LibraryAnalyzer:
         """Test message creation speed using real library."""
         try:
             connector = self._create_test_connector(lib)
-            iterations = 1000
+            iterations = MESSAGE_CREATION_ITERATIONS
             start_time = time.time()
             for i in range(iterations):
                 msg = await self._create_msg(connector, "D")
@@ -492,10 +558,10 @@ class LibraryAnalyzer:
             gc.collect()
             connectors = []
             messages = []
-            for i in range(50):
+            for i in range(MEMORY_CONNECTOR_COUNT):
                 connector = self._create_test_connector(lib)
                 connectors.append(connector)
-                for j in range(10):
+                for j in range(MEMORY_MESSAGES_PER_CONNECTOR):
                     msg = await self._create_msg(connector, "D")
                     msg.append_pair(11, f"ORDER_{i}_{j}")
                     msg.append_pair(55, "BTCUSDT")
@@ -519,7 +585,7 @@ class LibraryAnalyzer:
         try:
             connector = self._create_test_connector(lib)
             latencies = []
-            iterations = 100
+            iterations = LATENCY_ITERATIONS
             for i in range(iterations):
                 start = time.perf_counter()
                 msg = await self._create_msg(connector, "D")
@@ -1008,7 +1074,7 @@ class LibraryAnalyzer:
             test_msg.append_pair(54, "1")
             encoded_test = test_msg.encode()
 
-            sync_connector._receive_buffer = encoded_test
+            sync_connector._BinanceFixConnector__data = encoded_test
             async_connector._receive_buffer = encoded_test
             sync_parsed = sync_connector.parse_server_response()
             async_parsed = async_connector.parse_server_response()
@@ -1584,12 +1650,13 @@ Generated: {time.strftime("%Y-%m-%d %H:%M:%S")}
 
 | Metric | Value | Status |
 |--------|-------|--------|
-| **Overall Pass Rate** | {self.results.summary["overall_pass_rate"]:.1f}% | {"✅ EXCELLENT" if self.results.summary["overall_pass_rate"] >= 95 else "⚠️ NEEDS ATTENTION" if self.results.summary["overall_pass_rate"] >= 80 else "❌ FAILING"} |
-| **Performance Tests** | {self.results.get_pass_rate("performance"):.1f}% | {"✅" if self.results.get_pass_rate("performance") >= 80 else "❌"} |
+| **Correctness Pass Rate** | {self.results.summary["correctness_pass_rate"]:.1f}% | {"✅ EXCELLENT" if self.results.summary["correctness_pass_rate"] >= 95 else "⚠️ NEEDS ATTENTION" if self.results.summary["correctness_pass_rate"] >= 80 else "❌ FAILING"} |
+| **Performance Benchmarks** | {self.results.count("performance", "PASS")}/{len(self.results.performance)} measured | {"✅" if self.results.get_pass_rate("performance") >= 80 else "❌"} |
 | **Consistency Tests** | {self.results.get_pass_rate("consistency"):.1f}% | {"✅" if self.results.get_pass_rate("consistency") >= 95 else "❌"} |
 | **Feature Parity** | {self.results.get_pass_rate("feature_parity"):.1f}% | {"✅" if self.results.get_pass_rate("feature_parity") >= 90 else "❌"} |
 | **Exchange Operations** | {self.results.get_pass_rate("exchange_operations"):.1f}% | {"✅" if self.results.get_pass_rate("exchange_operations") >= 75 else "⚠️" if len(self.results.exchange_operations) > 0 else "🔒"} |
-| **Total Tests** | {self.results.summary["total_tests"]} | {"✅" if self.results.summary["total_tests"] > 0 else "❌"} |
+| **Total Checks** | {self.results.summary["total_tests"]} | {"✅" if self.results.summary["total_tests"] > 0 else "❌"} |
+| **Benchmark Method** | {BENCHMARK_REPEATS} measured repeats after {BENCHMARK_WARMUP_RUNS} warmup | median with min/max range |
 
 ### 🏛️ Library Status
 - **Sync Library**: {"✅ Available" if self.results.summary["sync_available"] else "❌ Not Available"}
@@ -1611,35 +1678,35 @@ Generated: {time.strftime("%Y-%m-%d %H:%M:%S")}
         report += """
 ### 🎯 Performance Metrics Breakdown
 
-| Metric | Sync Library | Async Library | Winner | Improvement |
-|--------|-------------|---------------|---------|-------------|
+| Metric | Sync Median | Async Median | Sync Min-Max | Async Min-Max | Winner | Difference |
+|--------|-------------|--------------|--------------|---------------|--------|------------|
 """
 
-        # Extract performance data for detailed comparison
         for test in self.results.performance:
-            if "msg/sec" in str(test.value):
-                if "async" in test.value and "sync" in test.value:
-                    parts = test.value.split(" vs ")
-                    async_val = parts[0].split()[0].replace(",", "")
-                    sync_val = parts[1].split()[0].replace(",", "")
-                    winner = "🏆 Sync" if "slower" in test.message else "🏆 Async"
-                    report += f"| Message Creation Speed | {sync_val} msg/sec | {async_val} msg/sec | {winner} | {test.message} |\n"
-            elif "MB" in str(test.value):
-                if "async" in test.value and "sync" in test.value:
-                    parts = test.value.split(" vs ")
-                    async_val = parts[0].split("MB")[0]
-                    sync_val = parts[1].split("MB")[0]
-                    if "efficient" in test.message:
-                        efficiency = test.message.split("%")[0].split()[-1]
-                        report += f"| Memory Usage | {sync_val} MB | {async_val} MB | 🏆 Async | {efficiency}% more efficient |\n"
-            elif "ms" in str(test.value) and "async" in test.value and "sync" in test.value:
-                parts = test.value.split(" vs ")
-                async_val = parts[0].split("ms")[0]
-                sync_val = parts[1].split("ms")[0]
-                if "faster" in test.message or "slower" in test.message:
-                    latency_change = test.message.split("%")[0].split()[-1]
-                    winner = "🏆 Async" if "faster" in test.message else "🏆 Sync"
-                    report += f"| Operation Latency | {sync_val} ms | {async_val} ms | {winner} | {latency_change}% |\n"
+            details = test.details
+            if "sync" not in details:
+                continue
+            fmt = details["fmt"]
+            unit = details["unit"]
+            async_stats = details["async"]
+            sync_stats = details["sync"]
+            pct = details["pct"]
+            positive_label, negative_label = self._comparison_labels(test.name, details["higher_is_better"])
+            label = positive_label if pct >= 0 else negative_label
+            winner = "🏆 Async" if pct >= 0 else "🏆 Sync"
+            sync_range = (
+                f"{self._format_metric(sync_stats['min'], fmt, unit)} - "
+                f"{self._format_metric(sync_stats['max'], fmt, unit)}"
+            )
+            async_range = (
+                f"{self._format_metric(async_stats['min'], fmt, unit)} - "
+                f"{self._format_metric(async_stats['max'], fmt, unit)}"
+            )
+            report += (
+                f"| {test.name} | {self._format_metric(sync_stats['median'], fmt, unit)} | "
+                f"{self._format_metric(async_stats['median'], fmt, unit)} | {sync_range} | "
+                f"{async_range} | {winner} | {abs(pct):.1f}% {label} |\n"
+            )
 
         report += """
 ## 🔍 Data Consistency Validation
@@ -1694,14 +1761,14 @@ Generated: {time.strftime("%Y-%m-%d %H:%M:%S")}
         report += f"""
 ### 🔧 API Compatibility Summary
 
-| Component | Sync Library | Async Library | Compatibility | Status |
+| Component | Sync Library | Async Library | Covered Result | Status |
 |-----------|-------------|---------------|---------------|---------|
-| Public Methods | Available | Available | 100% Compatible | ✅ Identical |
-| Constants (FixMsgTypes) | Available | Available | 100% Compatible | ✅ Identical |
-| Constants (FixTags) | Available | Available | 100% Compatible | ✅ Identical |
-| Factory Functions | Available | Available | 100% Compatible | ✅ Identical |
-| Constructor Parameters | Available | Available | 100% Compatible | ✅ Identical |
-| **Overall API Parity** | **Available** | **Available** | **{(passed_parity / total_parity) * 100:.1f}%** | **✅ Drop-in Replacement** |
+| Public Methods | Available | Available | Covered surface aligned | ✅ Aligned |
+| Constants (FixMsgTypes) | Available | Available | Covered constants aligned | ✅ Aligned |
+| Constants (FixTags) | Available | Available | Covered constants aligned | ✅ Aligned |
+| Factory Functions | Available | Available | Covered factories aligned | ✅ Aligned |
+| Constructor Parameters | Available | Available | Covered parameters aligned | ✅ Aligned |
+| **Overall API-Surface Checks** | **Available** | **Available** | **{passed_parity}/{total_parity} checks passed** | **✅ Supported Surface Aligned** |
 
 ## 🌐 Exchange Operations Testing
 
@@ -1743,11 +1810,11 @@ Generated: {time.strftime("%Y-%m-%d %H:%M:%S")}
 | Test Category | Tests Passed | Total Tests | Pass Rate | Status |
 |---------------|-------------|-------------|-----------|---------|
 {table_rows}
-| **Overall Exchange Operations** | **{passed_exchange}** | **{total_exchange}** | **{(passed_exchange / max(1, total_exchange)) * 100:.1f}%** | **{"✅ Production Ready" if (passed_exchange / max(1, total_exchange)) * 100 >= 75 else "⚠️ Needs Review"}** |
+| **Overall Exchange Operations** | **{passed_exchange}** | **{total_exchange}** | **{(passed_exchange / max(1, total_exchange)) * 100:.1f}%** | **{"✅ Testnet Validated" if (passed_exchange / max(1, total_exchange)) * 100 >= 75 else "⚠️ Needs Review"}** |
 
 #### 💡 Exchange Testing Notes
 - **Real Testnet**: {"✅ Used real Binance testnet credentials" if self.results.summary.get("real_testnet", False) else "⚠️ Used mock credentials (limited testing)"}
-- **Order Placement**: {"✅ Both libraries can create and manage orders identically" if passed_exchange >= 2 else "⚠️ Order management requires validation"}
+- **Order Placement**: {"✅ Covered order-management checks passed" if passed_exchange >= 2 else "⚠️ Order management requires validation"}
 - **Connection Stability**: {"✅ Both libraries maintain stable connections" if row_pass_counts.get("Exchange Connection Test", 0) > 0 else "⚠️ Connection stability needs testing"}
 - **Market Data**: {"✅ Consistent market data retrieval across libraries" if row_pass_counts.get("Market Data Consistency", 0) > 0 else "⚠️ Market data consistency needs validation"}
 """
@@ -1770,8 +1837,8 @@ To enable exchange testing:
 
 ### 📋 Overall Test Summary
 
-| Category | Tests | Passed | Failed | Skipped | Pass Rate |
-|----------|-------|--------|--------|---------|-----------|"""
+| Category | Checks | Completed/Passed | Failed | Skipped | Rate |
+|----------|--------|------------------|--------|---------|------|"""
 
         c = self.results.count
         cats = ["performance", "consistency", "feature_parity", "exchange_operations"]
@@ -1784,25 +1851,27 @@ To enable exchange testing:
         total_passed = sum(d["PASS"] for d in counts.values())
         total_failed = sum(d["FAIL"] for d in counts.values())
         total_skipped = sum(d["SKIP"] for d in counts.values())
+        total_runnable = total_passed + total_failed
+        total_rate = (total_passed / total_runnable) * 100 if total_runnable else 0.0
 
         report += f"""
 | Performance | {len(self.results.performance)} | {perf_passed} | {perf_failed} | {perf_skipped} | {self.results.get_pass_rate("performance"):.1f}% |
 | Consistency | {len(self.results.consistency)} | {cons_passed} | {cons_failed} | {cons_skipped} | {self.results.get_pass_rate("consistency"):.1f}% |
 | Feature Parity | {len(self.results.feature_parity)} | {feat_passed} | {feat_failed} | {feat_skipped} | {self.results.get_pass_rate("feature_parity"):.1f}% |
 | Exchange Operations | {len(self.results.exchange_operations)} | {exch_passed} | {exch_failed} | {exch_skipped} | {self.results.get_pass_rate("exchange_operations"):.1f}% |
-| **Total** | **{self.results.summary["total_tests"]}** | **{total_passed}** | **{total_failed}** | **{total_skipped}** | **{self.results.summary["overall_pass_rate"]:.1f}%** |
+| **Total** | **{self.results.summary["total_tests"]}** | **{total_passed}** | **{total_failed}** | **{total_skipped}** | **{total_rate:.1f}%** |
 
 ## 🎯 Recommendations & Migration Guide
 
 ### 🚀 When to Use Async Library
-- ✅ **Multi-session concurrent operations** - Superior throughput with multiple sessions
+- ✅ **Multi-session concurrent operations** - Non-blocking orchestration for multiple sessions
 - ✅ **Modern Python applications** - FastAPI, asyncio-based architectures
-- ✅ **Memory-constrained environments** - 7-15% better memory efficiency
-- ✅ **High-frequency trading scenarios** - Better P99 latency characteristics
-- ✅ **Scalable applications** - Native asyncio support for 100+ concurrent sessions
+- ✅ **Memory-conscious environments** - Review the generated Memory Efficiency row for the target host
+- ✅ **Latency research and execution prototyping** - Compare measured operation latency on the target host
+- ✅ **Async applications** - Native asyncio integration without thread-pool wrappers
 
 ### 🔧 When to Use Sync Library
-- ✅ **Single-session applications** - Slightly better raw throughput for single sessions
+- ✅ **Single-session applications** - Blocking control flow may be simpler; validate local throughput
 - ✅ **Legacy thread-based architectures** - Native threading integration
 - ✅ **Simple integration requirements** - Traditional blocking I/O patterns
 - ✅ **Thread-based applications** - Better integration with existing thread pools
@@ -1811,9 +1880,9 @@ To enable exchange testing:
 {("✅ **LOW-RISK MIGRATION CANDIDATE**" if self.results.get_pass_rate("consistency") >= 95 else "⚠️ **MIGRATION REQUIRES VALIDATION**")}
 
 #### Migration Safety Analysis
-- **Data Consistency**: {("Covered consistency checks passed" if self.results.get_pass_rate("consistency") == 100 else "High functional compatibility confirmed")}
+- **Data Consistency**: {("Covered consistency checks passed" if self.results.get_pass_rate("consistency") == 100 else "Some consistency checks need review")}
 - **API Compatibility**: {("Supported API surface parity confirmed" if self.results.get_pass_rate("feature_parity") >= 90 else "Some API differences exist")}
-- **Performance**: {("Comparable or better performance in all scenarios" if self.results.get_pass_rate("performance") >= 80 else "Performance validation required")}
+- **Performance**: {("Measured performance rows completed" if self.results.get_pass_rate("performance") >= 80 else "Performance validation required")}
 
 #### Migration Steps
 ```python
@@ -1842,9 +1911,9 @@ asyncio.run(main())
 
         # Determine winners by analyzing test results
         winners = {
-            "throughput": "Async (+26.2% message creation)",
-            "memory": "Async (+32.8% efficiency)",
-            "latency": "Mixed (async better for concurrent, sync for single ops)",
+            "throughput": "See Message Creation Speed row above",
+            "memory": "See Memory Efficiency row above",
+            "latency": "See Operation Latency row above",
             "scalability": "Async (native concurrent support)",
         }
 
@@ -1853,10 +1922,11 @@ asyncio.run(main())
 
         report += f"""
 ### 🎯 Performance Conclusion
-The async library provides {"better overall performance characteristics" if self.results.get_pass_rate("performance") >= 80 else "comparable performance"} with particular strengths in:
-- Message creation throughput (+26.2%)
-- Memory efficiency (+32.8%)
-- Concurrent session handling
+The async library provides {"a measured, host-dependent performance profile" if self.results.get_pass_rate("performance") >= 80 else "performance results that require review"} with repeated median/min/max samples for:
+- Message creation throughput
+- Peak memory usage
+- Operation latency
+- Concurrent session orchestration
 - Modern Python ecosystem integration
 
 ## 🏁 Final Conclusion
@@ -1866,10 +1936,10 @@ The async library provides {"better overall performance characteristics" if self
 ### Key Findings
 - **Compatibility**: {"✅ Supported API surface checks passed" if self.results.get_pass_rate("feature_parity") >= 90 else "⚠️ Some compatibility issues"}
 - **Data Integrity**: {"✅ Covered consistency checks passed" if self.results.get_pass_rate("consistency") == 100 else "⚠️ Some consistency issues"}
-- **Performance**: {"✅ Improved performance profile" if self.results.get_pass_rate("performance") >= 80 else "⚠️ Performance validation needed"}
+- **Performance**: {"✅ Performance rows completed" if self.results.get_pass_rate("performance") >= 80 else "⚠️ Performance validation needed"}
 
 ### Overall Assessment
-The async library {"demonstrates excellent compatibility and superior performance characteristics" if self.results.summary["overall_pass_rate"] >= 90 else "shows mixed results and requires further validation"}.
+The async library {"demonstrates strong covered compatibility with a host-dependent performance profile" if self.results.summary["overall_pass_rate"] >= 90 else "shows mixed results and requires further validation"}.
 {"Migration looks suitable for async applications after project-specific testnet validation." if self.results.get_pass_rate("consistency") >= 95 and self.results.get_pass_rate("feature_parity") >= 90 else "Thorough testing is recommended before production deployment."}
 
 ### Risk Assessment
@@ -1881,13 +1951,13 @@ The async library {"demonstrates excellent compatibility and superior performanc
 
 ### 📋 Analysis Metadata
 - **Analysis Duration**: {time.strftime("%Y-%m-%d %H:%M:%S")}
-- **Total Tests Executed**: {self.results.summary["total_tests"]}
+- **Total Checks Executed**: {self.results.summary["total_tests"]}
 - **Libraries Tested**: {"Both sync and async" if self.results.summary["sync_available"] and self.results.summary["async_available"] else "Async only"}
 - **Credentials Used**: {"Real Binance Testnet" if self.results.summary["real_testnet"] else "Mock/Synthetic"}
 - **Analysis Scope**: Performance, Consistency, Feature Parity, Function Examples
-- **Validation Method**: Comprehensive automated testing with statistical analysis
+- **Validation Method**: Automated checks plus repeated benchmark sampling with median/min/max reporting
 
-*Analysis completed with {self.results.summary["total_tests"]} tests across performance, consistency, and feature parity dimensions using {"real testnet credentials" if self.results.summary["real_testnet"] else "synthetic credentials"}.*
+*Analysis completed with {self.results.summary["total_tests"]} tests/checks across performance, consistency, and feature parity dimensions using {"real testnet credentials" if self.results.summary["real_testnet"] else "synthetic credentials"}.*
 """
 
         with Path("analysis_results.md").open("w") as f:
