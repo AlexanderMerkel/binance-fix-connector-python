@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "binance_fix_connector_async"
 version = "1.1.0"
 authors = [{name = "Binance"}]
-description = "Async Python library that provides access to Binance Financial Information eXchange (FIX) SPOT messages using the FIX protocol with full async/await support."
+description = "Asyncio-native Python connector for Binance SPOT FIX testing, latency research, and feed/session comparison."
 readme = "README.md"
 requires-python = ">=3.9"
 classifiers = [

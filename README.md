@@ -1,16 +1,16 @@
-# Binance FIX API Connector in Python (Async)
+# Async Binance SPOT FIX Connector for Python
 
-This is a high-performance Python library that provides access to Binance Financial Information eXchange (FIX) [SPOT messages](https://github.com/binance/binance-spot-api-docs/blob/master/fix-api.md#message-components) using the FIX protocol with full async/await support.
-It allows you to perform key operations such as placing orders, canceling orders, and querying current limit usage.
+This is an `asyncio`-native Python connector for Binance Financial Information eXchange (FIX) [SPOT messages](https://github.com/binance/binance-spot-api-docs/blob/master/fix-api.md#message-components).
+It is built for quick Python testing, latency research, and comparing FIX session/feed behavior across Order Entry, Market Data, and Drop Copy.
 
 ## Key Features
 
-- **High Performance**: Built with async/await for optimal concurrent performance and resource efficiency
-- **Modern Architecture**: Native asyncio implementation with explicit session lifecycle management
+- **Async-First API**: Native `asyncio` implementation for concurrent FIX sessions and feed experiments
+- **Quick Testing Workflow**: Examples for order entry, market data, drop copy, instrument queries, and limit checks
+- **Feed/Session Comparison**: One Python surface for comparing Binance SPOT FIX session behavior
+- **Latency Research Support**: Reproducible sync-vs-async benchmark checks for local research and regression testing
 - **Type Safe**: Type-annotated core library with `basedpyright` checks for `src/`
-- **Low Latency**: Optimized async message processing and connection handling
-- **Full API Coverage**: Support for all Binance FIX API message types (Order Entry, Market Data, Drop Copy)
-- **Production-Oriented**: Async session lifecycle handling, redacted logging, and marker-driven real testnet scenarios
+- **SPOT FIX Coverage**: Covers Binance public SPOT FIX session types: Order Entry, Market Data, and Drop Copy
 
 ## Prerequisites
 
@@ -234,43 +234,40 @@ The optional permission check uses Binance's mainnet HMAC Wallet API restriction
 - `get_api_key(config_path)` - Load API credentials from config file
 - `get_private_key(key_path)` - Load Ed25519 private key from PEM file
 
-## Async vs Original Library Comparison
+## Async Testing and Feed Research
 
-This async implementation (`binance-fix-connector-async`) is a modern alternative to the [original sync library](https://github.com/binance/binance-fix-connector-python). Both libraries provide identical FIX API functionality with different execution models.
+This async implementation (`binance-fix-connector-async`) is a lightweight research and testing alternative to the [original sync library](https://github.com/binance/binance-fix-connector-python). It targets the same public Binance SPOT FIX workflow areas with an async execution model, making it easier to run multiple sessions, compare feed behavior, and prototype Python FIX workflows.
 
-### Async Library Advantages
+### Async Connector Advantages
 
 | Feature | Async Implementation | Benefit |
 |---------|---------------------|---------|
-| **Concurrent Operations** | Native asyncio support | 20-40% better throughput with multiple sessions |
-| **Memory Efficiency** | Async I/O patterns | 7-15% lower memory usage |
-| **Modern Architecture** | Built for Python 3.9+ | Integrates with FastAPI, asyncio ecosystems |
-| **Resource Utilization** | Non-blocking operations | Better CPU and I/O efficiency |
-| **Scalability** | Coroutine-based | Handles 100+ concurrent sessions efficiently |
-| **P99 Latency** | Optimized async patterns | 50%+ better tail latency performance |
+| **Concurrent Sessions** | Native `asyncio` support | Run market data, order entry, and drop copy experiments together |
+| **Feed Research** | Shared async connector surface | Compare session behavior without changing execution model |
+| **Python Prototyping** | Built for Python 3.9+ | Fits notebooks, scripts, FastAPI, and asyncio research tooling |
+| **Latency Research** | Local operation-latency benchmark | Compare sync vs async overhead on the target host |
+| **Regression Checks** | Repeated benchmark rows | Track performance drift while changing parser/session code |
 
 ### Original Library Advantages
 
 | Feature | Sync Implementation | Benefit |
 |---------|-------------------|---------|
-| **Single Session Performance** | Thread-based execution | 2-5% better raw throughput for single sessions |
+| **Single Session Performance** | Thread-based execution | Can be slightly faster in single-session throughput; validate locally |
 | **Simplicity** | Traditional blocking I/O | Easier to understand for sync-only developers |
 | **Ecosystem Maturity** | Longer production usage | More battle-tested in diverse environments |
 | **Thread Integration** | Native threading | Better integration with thread-based applications |
 
 ### Performance Comparison
 
-Local benchmark snapshot:
+The benchmark suite supports local research and regression testing. It is reproducible by command, but the exact microbenchmark values are host- and run-dependent. It uses one warmup run, seven measured repeats, and writes median/min-max rows to `benchmark/analysis_results.md`:
 
-| Metric | Original (Sync) | Async Implementation | Difference |
-|--------|----------------|---------------------|-------------|
-| **Single Session Throughput** | 1,876 ops/sec | 1,825 ops/sec | -2.7% |
-| **Memory Usage** | 10.1 MB peak | 9.4 MB peak | **+7.5%** |
-| **P99 Latency** | 0.498 ms | 0.239 ms | **+52%** |
-| **Concurrent (50 sessions)** | 8,624 ops/sec | 8,124 ops/sec | -5.8% |
-| **Message Creation** | 1,211K msg/sec | 1,528K msg/sec | **+26%** |
+| Metric | Reproducible report row |
+|--------|-------------------------|
+| **Message Creation Speed** | Async vs sync message creation throughput |
+| **Memory Usage** | Async vs sync peak memory usage |
+| **Mean Operation Latency** | Async vs sync mean operation latency |
 
-Run `benchmark/comprehensive_analysis.py` on the target host before using these numbers for deployment decisions.
+Run `benchmark/comprehensive_analysis.py` on the target host before using benchmark numbers for comparisons. Treat the generated values as local measurements, not universal latency claims.
 
 ### 🔄 Migration Path
 
@@ -301,9 +298,9 @@ asyncio.run(main())
 
 ### 📈 Validation Results
 
-The benchmark suite checks:
+The benchmark suite supports:
 
-- **Performance**: 11 benchmark tests across throughput, latency, and memory
+- **Local performance research**: repeated median/min-max checks for message creation speed, peak memory usage, and mean operation latency
 - **Consistency**: message construction and state-transition parity checks
 - **Compatibility**: supported public factory and connector methods
 
@@ -316,9 +313,9 @@ python comprehensive_analysis.py
 
 ## Documentation
 
-### Performance Analysis
+### Benchmark and Research Notes
 
-- **[Benchmark Results](benchmark/README.md)** - Comprehensive performance analysis
+- **[Benchmark Results](benchmark/README.md)** - Reproducible local benchmark and compatibility analysis
 - **Run Analysis**: `python benchmark/comprehensive_analysis.py`
 
 ### Official Binance Documentation
@@ -327,9 +324,9 @@ python comprehensive_analysis.py
 
 ## Summary
 
-Both libraries provide FIX API access with different execution models. Choose based on your architecture:
+Both libraries provide Binance SPOT FIX access with different execution models. Choose based on your workflow:
 
-- **Async**: Better for modern, concurrent, memory-conscious applications
+- **Async**: Better for concurrent Python testing, feed/session comparison, and async research workflows
 - **Original**: Better for simple, single-session, thread-based applications
 
 Validate the real testnet examples and E2E runner with your own FIX key before using the async connector in production.
