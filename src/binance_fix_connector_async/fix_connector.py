@@ -543,16 +543,15 @@ class BinanceFixConnector:
         return base64.b64encode(signature).decode("ASCII")
 
     @staticmethod
-    def _try_parse_raw_message(raw_msg: str, fix_version: str) -> FixMessage | None:
-        """Parse a single raw FIX message string into a FixMessage, or return None if incomplete."""
-        tag_values = [x for x in raw_msg.split(_SOH_) if "=" in x and not x.startswith("=")]
-        if len(tag_values) > 1 and tag_values[0] == "8=" and tag_values[1] == fix_version:
-            tag_values.pop(0)
-            tag_values[0] = f"8={fix_version}"
-        if not (tag_values[-1].startswith("10=") and len(tag_values[-1]) >= TRAILER_SIZE):
+    def _try_parse_raw_message(raw_msg: bytes, fix_version: str) -> FixMessage | None:
+        """Parse one raw FIX message into a FixMessage, or return None if incomplete."""
+        tag_values = [x for x in raw_msg.split(b"\x01") if b"=" in x and not x.startswith(b"=")]
+        if not tag_values or not (tag_values[-1].startswith(b"10=") and len(tag_values[-1]) >= TRAILER_SIZE):
             return None
         fix_msg = FixMessage()
-        fix_msg.append_strings(tag_values)
+        for tag_value in tag_values:
+            tag, _, value = tag_value.partition(b"=")
+            fix_msg.append_pair(int(tag), value)
         return fix_msg
 
     def parse_server_response(self) -> list[FixMessage]:
@@ -565,21 +564,18 @@ class BinanceFixConnector:
         """
         if len(self._receive_buffer) < MIN_FIX_MESSAGE_LENGTH:
             return []
-        try:
-            raw_data = self._receive_buffer.decode("utf-8")
-        except UnicodeDecodeError:
-            if len(self._receive_buffer) > MAX_BUFFER_SIZE:
-                self._receive_buffer = b""
-            return []
-        msg = raw_data if raw_data.startswith(_SOH_) else f"{_SOH_}{raw_data}"
-        raw_messages = [f"8={x}" for x in msg.split(f"{_SOH_}8=") if x]
+        raw_messages = self._receive_buffer.split(b"\x018=")
+        if self._receive_buffer.startswith(b"8="):
+            raw_messages[1:] = [b"8=" + x for x in raw_messages[1:] if x]
+        else:
+            raw_messages = [b"8=" + x for x in raw_messages if x]
         messages: list[FixMessage] = []
         for i, raw_msg in enumerate(raw_messages):
             fix_msg = self._try_parse_raw_message(raw_msg, self.fix_version)
             if fix_msg is not None:
                 messages.append(fix_msg)
             else:
-                self._receive_buffer = bytes(f"{_SOH_}".join(raw_messages[i:]).encode("ASCII"))
+                self._receive_buffer = b"\x01".join(raw_messages[i:])
                 return messages
 
         self._receive_buffer = b""
@@ -618,6 +614,8 @@ class BinanceFixConnector:
             raise
 
     def _log_received_messages(self, messages: list[FixMessage]) -> None:
+        if not self.logger.isEnabledFor(logging.INFO):
+            return
         for msg in messages:
             try:
                 clean_message = _sanitize_fix_message(msg.encode().decode("utf-8"))
@@ -904,8 +902,9 @@ class BinanceFixConnector:
 
             self.msg_seq_num = next_seq_num
             self.messages_sent.append(message)
-            clean_message = _sanitize_fix_message(encoded.decode("utf-8"))
-            self.logger.info("Client=>Server: %s", clean_message)
+            if self.logger.isEnabledFor(logging.INFO):
+                clean_message = _sanitize_fix_message(encoded.decode("utf-8"))
+                self.logger.info("Client=>Server: %s", clean_message)
 
     async def create_fix_message_with_basic_header(
         self,
