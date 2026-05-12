@@ -1,0 +1,85 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "binance_fix_connector_async"
+version = "1.1.0"
+authors = [{name = "Binance"}]
+description = "Async Python library that provides access to Binance Financial Information eXchange (FIX) SPOT messages using the FIX protocol with full async/await support."
+readme = "README.md"
+requires-python = ">=3.9"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Financial and Insurance Industry",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "simplefix>=1.0.0",
+    "cryptography>=38.0.0",
+    "aiohttp>=3.8",
+]
+license = "MIT"
+keywords = ["binance", "fix", "connector", "async", "trading"]
+
+[project.urls]
+Homepage = "https://github.com/AlexanderMerkel/binance-fix-connector-python"
+Repository = "https://github.com/AlexanderMerkel/binance-fix-connector-python"
+"Bug Tracker" = "https://github.com/AlexanderMerkel/binance-fix-connector-python/issues"
+Changelog = "https://github.com/AlexanderMerkel/binance-fix-connector-python/blob/main/CHANGELOG.md"
+
+[project.optional-dependencies]
+dev = ["black", "pytest", "pytest-asyncio", "pytest-timeout", "pytest-xdist", "basedpyright", "ruff", "vulture"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "--tb=short -q"
+markers = [
+    "requires_testnet: mark test as requiring real testnet access",
+    "load_test: mark test as load/performance test",
+    "error_scenario: mark test as error scenario test",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning:simplefix",
+    "ignore::pytest.PytestDeprecationWarning",
+]
+
+[tool.ruff]
+target-version = "py39"
+line-length = 120
+
+[tool.black]
+line-length = 120
+target-version = ["py39"]
+
+[tool.ruff.lint]
+select = ["F", "E", "W", "I", "UP", "B", "SIM", "RUF", "ASYNC"]
+ignore = ["E501", "B008", "SIM108"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["B011", "B017", "B007", "B904"]
+"examples/*" = ["T201", "E402", "RUF001"]
+"benchmark/*" = ["T201", "E402"]
+
+[tool.basedpyright]
+pythonVersion = "3.9"
+typeCheckingMode = "basic"
+reportMissingTypeStubs = false
+exclude = ["build", "benchmark"]
+
+[tool.vulture]
+paths = ["src"]
+min_confidence = 90
+exclude = ["tests", "examples", "benchmark"]
+ignore_decorators = ["@pytest.fixture"]
+ignore_names = ["test_*", "setUp", "tearDown"]

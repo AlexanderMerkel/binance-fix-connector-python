@@ -1,0 +1,27 @@
+{
+  "environment": "testnet",
+  "testnet": {
+    "BINANCE_FIX_KEY": "YOUR_TESTNET_API_KEY_HERE",
+    "BINANCE_FIX_PRIVATE_KEY_PATH": "~/.ssh/private_key_ed25519.pem",
+    "endpoints": {
+      "market_data": "tcp+tls://fix-md.testnet.binance.vision:9000",
+      "order_entry": "tcp+tls://fix-oe.testnet.binance.vision:9000",
+      "drop_copy": "tcp+tls://fix-dc.testnet.binance.vision:9000"
+    }
+  },
+  "mainnet": {
+    "BINANCE_FIX_KEY": "YOUR_MAINNET_API_KEY_HERE",
+    "BINANCE_FIX_PRIVATE_KEY_PATH": "~/.ssh/private_key_ed25519.pem",
+    "endpoints": {
+      "market_data": "tcp+tls://fix-md.binance.com:9000",
+      "order_entry": "tcp+tls://fix-oe.binance.com:9000",
+      "drop_copy": "tcp+tls://fix-dc.binance.com:9000"
+    }
+  },
+  "test_settings": {
+    "skip_on_auth_failure": true,
+    "connection_timeout": 10,
+    "test_timeout": 30,
+    "enable_integration_tests": false
+  }
+}

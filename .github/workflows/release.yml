@@ -1,0 +1,32 @@
+name: Release Distributables
+
+on:
+  release:
+    types:
+      - published
+
+jobs:
+  build-n-upload:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.13"
+    - uses: actions/cache@v4
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('pyproject.toml') }}
+    - run: |
+        python3 -m pip install --upgrade build
+        pip install -U pip setuptools
+    - name: Build new distributables
+      run: python3 -m build
+    - name: Upload distributables to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        user: __token__
+        password: ${{ secrets.PYPI_API_TOKEN }}
+    - name: Post release cleaning
+      run: |
+        rm dist/*
