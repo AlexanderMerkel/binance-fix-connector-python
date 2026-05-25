@@ -86,7 +86,7 @@ class TestDropCopyFunctionality(BaseE2ETest):
                     )
                     await oe_session.send_message(order_msg)
 
-                    oe_responses = await self.wait_for_messages(oe_session, ["8"], timeout=10)
+                    oe_responses = await self.wait_for_messages(oe_session, ["8"], timeout_seconds=10)
                     oe_report = next(
                         (
                             msg
@@ -108,7 +108,7 @@ class TestDropCopyFunctionality(BaseE2ETest):
                             symbol="BTCUSDT",
                         )
                         await oe_session.send_message(cancel_msg)
-                        await self.wait_for_messages(oe_session, ["8"], timeout=10)
+                        await self.wait_for_messages(oe_session, ["8"], timeout_seconds=10)
 
                     drop_copy_report = await self._wait_for_drop_copy_execution_report(session, cl_ord_id)
                     metrics.messages_received += 1
@@ -136,10 +136,10 @@ class TestDropCopyFunctionality(BaseE2ETest):
         value = message.get(tag)
         return value.decode() if value else None
 
-    async def _wait_for_drop_copy_execution_report(self, session, cl_ord_id: str, timeout: float = 20):
+    async def _wait_for_drop_copy_execution_report(self, session, cl_ord_id: str, timeout_seconds: float = 20):
         start_time = time.time()
         execution_reports = []
-        while time.time() - start_time < timeout:
+        while time.time() - start_time < timeout_seconds:
             for msg in await session.get_all_new_messages_received():
                 if self._field(msg, FixTags.MSG_TYPE) != "8":
                     continue

@@ -25,7 +25,7 @@ import tracemalloc
 import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any
 
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
@@ -49,8 +49,8 @@ class TestResult:
 
     name: str
     status: str  # "PASS", "FAIL", "SKIP"
-    value: Optional[Union[float, int, str]] = None
-    expected: Optional[Union[float, int, str]] = None
+    value: float | int | str | None = None
+    expected: float | int | str | None = None
     message: str = ""
     duration: float = 0.0
     details: dict[str, Any] = field(default_factory=dict)

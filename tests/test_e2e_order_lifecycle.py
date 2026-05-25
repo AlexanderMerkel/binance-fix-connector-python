@@ -87,7 +87,7 @@ class TestCompleteOrderLifecycle(BaseE2ETest):
                 execution_responses = await self.wait_for_messages(
                     session,
                     ["8"],
-                    timeout=10,  # Execution Report
+                    timeout_seconds=10,  # Execution Report
                 )
                 self.assertGreater(len(execution_responses), 0)
             except TimeoutError:
@@ -125,7 +125,7 @@ class TestCompleteOrderLifecycle(BaseE2ETest):
 
             await session.send_message(cancel_msg)
 
-            cancel_responses = await self.wait_for_messages(session, ["8"], timeout=10)
+            cancel_responses = await self.wait_for_messages(session, ["8"], timeout_seconds=10)
             self.assertGreater(len(cancel_responses), 0)
             cancel_report = cancel_responses[-1]
             cancel_status = cancel_report.get("39")

@@ -15,7 +15,7 @@ import ssl
 import time
 from collections import deque
 from contextlib import suppress
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, NamedTuple
 from urllib.parse import urlparse
 
@@ -508,7 +508,7 @@ class BinanceFixConnector:
         -------
             - datetime in string format YYYYmmdd-HH:MM:SS.ffffff
         """
-        return datetime.now(timezone.utc).strftime("%Y%m%d-%H:%M:%S.%f")
+        return datetime.now(UTC).strftime("%Y%m%d-%H:%M:%S.%f")
 
     def generate_signature(
         self,
@@ -609,7 +609,7 @@ class BinanceFixConnector:
                 self._liveness_task = asyncio.create_task(self._monitor_liveness())
                 self._liveness_task.add_done_callback(self._handle_task_exception)
 
-        except (OSError, ssl.SSLError, asyncio.TimeoutError):
+        except (TimeoutError, OSError, ssl.SSLError):
             self.logger.exception("Error connecting")
             raise
 
@@ -845,7 +845,7 @@ class BinanceFixConnector:
             try:
                 await asyncio.wait_for(self._message_event.wait(), timeout=remaining)
                 self._message_event.clear()
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 break
 
         advance_shared_cursor()
@@ -1143,7 +1143,7 @@ class BinanceFixConnector:
         self.logger.info("Performing scheduled restart...")
         try:
             await self.reconnect()
-        except (OSError, ConnectionError, asyncio.TimeoutError):
+        except (TimeoutError, OSError, ConnectionError):
             self.logger.exception("Scheduled restart failed")
 
     async def reconnect(self) -> None:
@@ -1187,7 +1187,7 @@ class BinanceFixConnector:
 
             self.logger.info("Restart completed successfully")
 
-        except (OSError, ConnectionError, asyncio.TimeoutError):
+        except (TimeoutError, OSError, ConnectionError):
             self.logger.exception("Error during restart")
             try:
                 await new_session.disconnect()

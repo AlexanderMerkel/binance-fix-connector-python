@@ -15,7 +15,7 @@ import unittest
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric import ed25519
@@ -73,11 +73,11 @@ def test_e2e_runner_mocked_alias_is_not_named_unit():
 class E2ECredentials:
     """Manages test credentials and configuration."""
 
-    def __init__(self, config_path: Optional[str] = None):
+    def __init__(self, config_path: str | None = None):
         """Initialize with config file path."""
         self.config_path = config_path or self._find_config_file()
-        self.api_key: Optional[str] = None
-        self.private_key: Optional[ed25519.Ed25519PrivateKey] = None
+        self.api_key: str | None = None
+        self.private_key: ed25519.Ed25519PrivateKey | None = None
         self._load_credentials()
 
     def _find_config_file(self) -> str:
@@ -139,14 +139,14 @@ class SessionMetrics:
 
     def reset(self) -> None:
         """Reset all metrics."""
-        self.connection_time: Optional[float] = None
-        self.logon_time: Optional[float] = None
-        self.logout_time: Optional[float] = None
+        self.connection_time: float | None = None
+        self.logon_time: float | None = None
+        self.logout_time: float | None = None
         self.messages_sent: int = 0
         self.messages_received: int = 0
         self.errors: list[str] = []
-        self.start_time: Optional[float] = None
-        self.end_time: Optional[float] = None
+        self.start_time: float | None = None
+        self.end_time: float | None = None
 
     def start_timing(self) -> None:
         """Start timing session."""
@@ -157,7 +157,7 @@ class SessionMetrics:
         self.end_time = time.time()
 
     @property
-    def total_duration(self) -> Optional[float]:
+    def total_duration(self) -> float | None:
         """Get total session duration."""
         if self.start_time and self.end_time:
             return self.end_time - self.start_time
@@ -171,7 +171,7 @@ class E2ETestSession:
         self,
         session_type: str,
         credentials: E2ECredentials,
-        endpoint_override: Optional[str] = None,
+        endpoint_override: str | None = None,
         use_real_testnet: bool = False,
     ):
         """Initialize E2E test session."""
@@ -179,7 +179,7 @@ class E2ETestSession:
         self.credentials = credentials
         self.endpoint_override = endpoint_override
         self.use_real_testnet = use_real_testnet
-        self.session: Optional[BinanceFixConnector] = None
+        self.session: BinanceFixConnector | None = None
         self.metrics = SessionMetrics()
         self._connected = False
         self._logged_in = False
@@ -404,7 +404,7 @@ class BaseE2ETest(unittest.IsolatedAsyncioTestCase):
         self,
         session_type: str,
         use_real_testnet: bool = False,
-        endpoint_override: Optional[str] = None,
+        endpoint_override: str | None = None,
     ):
         """Create managed test session with automatic cleanup."""
         session_wrapper = E2ETestSession(
@@ -423,13 +423,13 @@ class BaseE2ETest(unittest.IsolatedAsyncioTestCase):
         self,
         session: BinanceFixConnector,
         expected_types: list[str],
-        timeout: float = MESSAGE_TIMEOUT,
+        timeout_seconds: float = MESSAGE_TIMEOUT,
     ) -> list[FixMessage]:
         """Wait for specific message types with timeout."""
         start_time = time.time()
         received_messages = []
 
-        while time.time() - start_time < timeout:
+        while time.time() - start_time < timeout_seconds:
             messages = await session.get_all_new_messages_received()
             received_messages.extend(messages)
 
@@ -446,7 +446,7 @@ class BaseE2ETest(unittest.IsolatedAsyncioTestCase):
         self,
         message: FixMessage,
         expected_type: str,
-        required_fields: Optional[list[str]] = None,
+        required_fields: list[str] | None = None,
     ) -> None:
         """Assert message has correct structure and required fields."""
         # Check message type
@@ -480,7 +480,7 @@ class BaseE2ETest(unittest.IsolatedAsyncioTestCase):
         metrics: SessionMetrics,
         min_messages: int = 0,
         max_errors: int = 0,
-        max_duration: Optional[float] = None,
+        max_duration: float | None = None,
     ) -> None:
         """Assert session metrics meet expectations."""
         total_messages = metrics.messages_sent + metrics.messages_received
@@ -528,7 +528,7 @@ class BaseE2ETest(unittest.IsolatedAsyncioTestCase):
     async def _create_order(
         self,
         session,
-        order_id: Optional[str] = None,
+        order_id: str | None = None,
         *,
         symbol: str = "BTCUSDT",
         side: str = "1",

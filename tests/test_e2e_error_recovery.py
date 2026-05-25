@@ -92,8 +92,8 @@ class TestNetworkErrorRecovery(BaseE2ETest):
             # Simulate timeout handling by adding timeout-related error
             try:
                 # Mock a timeout scenario by creating a timeout exception
-                raise asyncio.TimeoutError("Heartbeat response timeout")
-            except asyncio.TimeoutError as e:
+                raise TimeoutError("Heartbeat response timeout")
+            except TimeoutError as e:
                 metrics.errors.append(f"Heartbeat timeout detected: {e}")
 
             # Try to recover with a new heartbeat

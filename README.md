@@ -22,6 +22,7 @@ pip install binance-fix-connector-async
 
 **Notes:**
 
+- Python 3.13 or newer is required.
 - FIX API only support Ed25519 keys. Please refer to this [tutorial](https://www.binance.com/en/support/faq/how-to-generate-an-ed25519-key-pair-to-send-api-requests-on-binance-6b9a63f1e3384cf48a2eedb82767a69a) for setting up an Ed25519 key pair on the mainnet, and this one for the [testnet](https://testnet.binance.vision/).
 - Ensure that your API key has the appropriate Fix API permissions for the Testnet environment before you begin testing.
 - Real testnet scenarios are marker-driven with `requires_testnet` and are not part of default CI runs.
@@ -244,7 +245,7 @@ This async implementation (`binance-fix-connector-async`) is a lightweight resea
 |---------|---------------------|---------|
 | **Concurrent Sessions** | Native `asyncio` support | Run market data, order entry, and drop copy experiments together |
 | **Feed Research** | Shared async connector surface | Compare session behavior without changing execution model |
-| **Python Prototyping** | Built for Python 3.9+ | Fits notebooks, scripts, FastAPI, and asyncio research tooling |
+| **Python Prototyping** | Built for Python 3.13+ | Fits notebooks, scripts, FastAPI, and asyncio research tooling |
 | **Latency Research** | Local operation-latency benchmark | Compare sync vs async overhead on the target host |
 | **Regression Checks** | Repeated benchmark rows | Track performance drift while changing parser/session code |
 

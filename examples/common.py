@@ -112,9 +112,9 @@ async def run_stream_loop(session, handler, duration=30, poll_interval=1) -> int
     return count
 
 
-async def wait_for_logon(session: BinanceFixConnector, timeout: int = 10) -> bool:
+async def wait_for_logon(session: BinanceFixConnector, timeout_seconds: int = 10) -> bool:
     """Wait for logon response. Returns True if logon succeeded."""
-    responses = await session.retrieve_messages_until(message_type=["A", "3", "5"], timeout_seconds=timeout)
+    responses = await session.retrieve_messages_until(message_type=["A", "3", "5"], timeout_seconds=timeout_seconds)
     if not responses:
         session.logger.error("Failed to receive logon response")
         return False

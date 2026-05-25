@@ -11,7 +11,7 @@ import hmac
 import json
 import time
 from configparser import ConfigParser
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from cryptography.hazmat.primitives.asymmetric.types import PrivateKeyTypes
 
 
-class SessionType(str, Enum):
+class SessionType(StrEnum):
     MARKET_DATA = "market_data"
     ORDER_ENTRY = "order_entry"
     DROP_COPY = "drop_copy"
