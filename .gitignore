@@ -176,6 +176,8 @@ benchmark/*.png
 
 # Claude worktrees
 .claude/worktrees/
+**/AGENTS.md
+**/CLAUDE.md
 .serena/
 .opencode/
 .codex/

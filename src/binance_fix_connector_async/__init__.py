@@ -3,7 +3,7 @@
 from importlib.metadata import PackageNotFoundError, version
 
 try:
-    __version__ = version("binance_fix_connector_async")
+    __version__ = version("binance-fix-connector-async")
 except PackageNotFoundError:
     __version__ = "0.0.0"
 

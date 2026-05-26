@@ -641,8 +641,8 @@ class LibraryAnalyzer:
                 name="Message Content Consistency",
                 status="PASS" if consistency_rate == 100 else "FAIL",
                 value=f"{consistency_rate:.1f}%",
-                expected="100%",
-                message=f"{consistent_count}/{total_count} scenarios identical",
+                expected="All sampled scenarios match",
+                message=f"{consistent_count}/{total_count} sampled scenarios matched",
             )
 
         except Exception as e:
@@ -673,8 +673,8 @@ class LibraryAnalyzer:
             return TestResult(
                 name="State Synchronization",
                 status="PASS" if states_match else "FAIL",
-                value="Identical" if states_match else "Different",
-                expected="Identical",
+                value="Sampled states match" if states_match else "Different",
+                expected="Sampled states match",
                 message=f"Tested {len(state_scenarios)} state transitions",
             )
 
@@ -706,8 +706,8 @@ class LibraryAnalyzer:
                 name="Error Handling Consistency",
                 status="PASS" if consistency_rate == 100 else "FAIL",
                 value=f"{consistency_rate:.1f}%",
-                expected="100%",
-                message=f"{consistent_errors}/{total_errors} error scenarios identical",
+                expected="All sampled scenarios match",
+                message=f"{consistent_errors}/{total_errors} sampled error scenarios matched",
             )
 
         except Exception as e:
@@ -808,8 +808,8 @@ class LibraryAnalyzer:
             return TestResult(
                 name="Constants Parity",
                 status="PASS" if msg_types_match and tags_match else "FAIL",
-                value="Identical" if msg_types_match and tags_match else "Different",
-                expected="Identical",
+                value="Required constants present" if msg_types_match and tags_match else "Different",
+                expected="Required constants present",
                 message=f"FixMsgTypes: {msg_types_match}, FixTags: {tags_match}",
             )
 
@@ -838,8 +838,8 @@ class LibraryAnalyzer:
             return TestResult(
                 name="Factory Functions Parity",
                 status="PASS" if params_match else "FAIL",
-                value="Identical" if params_match else "Different",
-                expected="Identical",
+                value="Parameter sets match" if params_match else "Different",
+                expected="Parameter sets match",
                 message=f"Parameter compatibility: {params_match}",
             )
 
@@ -1273,9 +1273,9 @@ class LibraryAnalyzer:
             return TestResult(
                 name="Market Data Consistency",
                 status="PASS" if data_consistent else "FAIL",
-                value="Identical market data" if data_consistent else "Different market data",
-                expected="Identical",
-                message=f"Both libraries retrieved consistent market data for {sync_data.get('symbol', 'N/A')}",
+                value="Sampled fields match" if data_consistent else "Different market data",
+                expected="Sampled fields match",
+                message=f"Sampled market data fields matched for {sync_data.get('symbol', 'N/A')}",
             )
 
         except Exception as e:
@@ -1307,9 +1307,9 @@ class LibraryAnalyzer:
             return TestResult(
                 name="Order Management Test",
                 status="PASS" if orders_match else "FAIL",
-                value="Identical order behavior" if orders_match else "Different order behavior",
-                expected="Identical",
-                message=f"Order placement: {'✅' if orders_match else '❌'}, Both libraries handle orders identically",
+                value="Sampled fields match" if orders_match else "Different order behavior",
+                expected="Sampled fields match",
+                message=f"Order placement: {'✅' if orders_match else '❌'}, sampled order fields matched: {orders_match}",
             )
 
         except Exception as e:
@@ -1725,16 +1725,19 @@ Generated: {time.strftime("%Y-%m-%d %H:%M:%S")}
         passed_consistency = self.results.count("consistency", "PASS")
         total_consistency = self.results.count("consistency")
 
+        consistency_rate = (passed_consistency / total_consistency) * 100 if total_consistency else 0.0
+        consistency_status = "Sampled checks passed" if passed_consistency == total_consistency else "Needs review"
+
         report += f"""
 ### 🧪 Consistency Analysis Summary
 
 | Category | Tests Passed | Total Tests | Pass Rate | Status |
 |----------|-------------|-------------|-----------|---------|
-| Message Content | 1 | 1 | 100% | ✅ Perfect |
-| State Management | 1 | 1 | 100% | ✅ Perfect |
-| Error Handling | 1 | 1 | 100% | ✅ Perfect |
-| Sequence Numbers | 1 | 1 | 100% | ✅ Perfect |
-| **Overall Consistency** | **{passed_consistency}** | **{total_consistency}** | **{(passed_consistency / total_consistency) * 100:.1f}%** | **✅ Identical** |
+| Message Content | 1 | 1 | Sampled | Scenario check |
+| State Management | 1 | 1 | Sampled | Scenario check |
+| Error Handling | 1 | 1 | Sampled | Scenario check |
+| Sequence Numbers | 1 | 1 | Sampled | Scenario check |
+| **Overall Consistency** | **{passed_consistency}** | **{total_consistency}** | **{consistency_rate:.1f}%** | **{consistency_status}** |
 
 """
 
@@ -1791,7 +1794,7 @@ Generated: {time.strftime("%Y-%m-%d %H:%M:%S")}
             rows_data = [
                 ("Connection Tests", "Exchange Connection Test", "Connected", "Failed"),
                 ("Market Data", "Market Data Consistency", "Consistent", "Inconsistent"),
-                ("Order Management", "Order Management Test", "Identical", "Different"),
+                ("Order Management", "Order Management Test", "Sampled fields match", "Different"),
                 ("Error Handling", "Exchange Error Handling", "Consistent", "Inconsistent"),
             ]
             table_rows = ""
@@ -1939,7 +1942,7 @@ The async library provides {"a measured, host-dependent performance profile" if 
 - **Performance**: {"✅ Performance rows completed" if self.results.get_pass_rate("performance") >= 80 else "⚠️ Performance validation needed"}
 
 ### Overall Assessment
-The async library {"demonstrates strong covered compatibility with a host-dependent performance profile" if self.results.summary["overall_pass_rate"] >= 90 else "shows mixed results and requires further validation"}.
+The async library {"performs well across the sampled compatibility checks with a host-dependent performance profile" if self.results.summary["overall_pass_rate"] >= 90 else "shows mixed results and requires further validation"}.
 {"Migration looks suitable for async applications after project-specific testnet validation." if self.results.get_pass_rate("consistency") >= 95 and self.results.get_pass_rate("feature_parity") >= 90 else "Thorough testing is recommended before production deployment."}
 
 ### Risk Assessment

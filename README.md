@@ -1,16 +1,16 @@
 # Async Binance SPOT FIX Connector for Python
 
-This is an `asyncio`-native Python connector for Binance Financial Information eXchange (FIX) [SPOT messages](https://github.com/binance/binance-spot-api-docs/blob/master/fix-api.md#message-components).
-It is built for quick Python testing, latency research, and comparing FIX session/feed behavior across Order Entry, Market Data, and Drop Copy.
+This is an unofficial `asyncio`-native Python connector for Binance Financial Information eXchange (FIX) [SPOT messages](https://github.com/binance/binance-spot-api-docs/blob/master/fix-api.md#message-components).
+It is aimed at testnet workflows, session experiments, and local latency research across Order Entry, Market Data, and Drop Copy.
 
 ## Key Features
 
-- **Async-First API**: Native `asyncio` implementation for concurrent FIX sessions and feed experiments
+- **Async-First API**: `asyncio` session management for running multiple FIX workflows in one event loop
 - **Quick Testing Workflow**: Examples for order entry, market data, drop copy, instrument queries, and limit checks
-- **Feed/Session Comparison**: One Python surface for comparing Binance SPOT FIX session behavior
-- **Latency Research Support**: Reproducible sync-vs-async benchmark checks for local research and regression testing
-- **Type Safe**: Type-annotated core library with `basedpyright` checks for `src/`
-- **SPOT FIX Coverage**: Covers Binance public SPOT FIX session types: Order Entry, Market Data, and Drop Copy
+- **Feed/Session Comparison**: Shared API surface for comparing Order Entry, Market Data, and Drop Copy behavior
+- **Latency Research Support**: Local sync-vs-async benchmark checks for research and regression testing
+- **Typed Core**: Type-annotated core library with `basedpyright` checks for `src/`
+- **SPOT FIX Workflows**: Helpers for Binance public SPOT FIX workflow areas: Order Entry, Market Data, and Drop Copy
 
 ## Prerequisites
 
@@ -23,7 +23,7 @@ pip install binance-fix-connector-async
 **Notes:**
 
 - Python 3.13 or newer is required.
-- FIX API only support Ed25519 keys. Please refer to this [tutorial](https://www.binance.com/en/support/faq/how-to-generate-an-ed25519-key-pair-to-send-api-requests-on-binance-6b9a63f1e3384cf48a2eedb82767a69a) for setting up an Ed25519 key pair on the mainnet, and this one for the [testnet](https://testnet.binance.vision/).
+- Binance FIX API supports Ed25519 keys. Please refer to this [tutorial](https://www.binance.com/en/support/faq/how-to-generate-an-ed25519-key-pair-to-send-api-requests-on-binance-6b9a63f1e3384cf48a2eedb82767a69a) for setting up an Ed25519 key pair on the mainnet, and this one for the [testnet](https://testnet.binance.vision/).
 - Ensure that your API key has the appropriate Fix API permissions for the Testnet environment before you begin testing.
 - Real testnet scenarios are marker-driven with `requires_testnet` and are not part of default CI runs.
 
@@ -237,7 +237,7 @@ The optional permission check uses Binance's mainnet HMAC Wallet API restriction
 
 ## Async Testing and Feed Research
 
-This async implementation (`binance-fix-connector-async`) is a lightweight research and testing alternative to the [original sync library](https://github.com/binance/binance-fix-connector-python). It targets the same public Binance SPOT FIX workflow areas with an async execution model, making it easier to run multiple sessions, compare feed behavior, and prototype Python FIX workflows.
+This project is an unofficial async research connector, not a replacement for Binance's [official sync library](https://github.com/binance/binance-fix-connector-python). It targets public Binance SPOT FIX workflow areas with an async execution model, making it easier to run multiple sessions, compare feed behavior, and prototype Python FIX workflows.
 
 ### Async Connector Advantages
 
@@ -275,7 +275,7 @@ Run `benchmark/comprehensive_analysis.py` on the target host before using benchm
 **Migration Scope:**
 
 - Async code must add `await` around session creation, send/receive, and cleanup calls.
-- Message construction and supported FIX fields are intended to stay aligned with the original connector.
+- Message construction and supported FIX fields are intended to stay close to the original connector where the public APIs overlap.
 - Both libraries can be installed side by side under different import names.
 
 **Migration Steps:**
@@ -327,8 +327,8 @@ python comprehensive_analysis.py
 
 Both libraries provide Binance SPOT FIX access with different execution models. Choose based on your workflow:
 
-- **Async**: Better for concurrent Python testing, feed/session comparison, and async research workflows
-- **Original**: Better for simple, single-session, thread-based applications
+- **Async**: Useful for concurrent testnet scripts, feed/session comparison, and async research workflows
+- **Official sync connector**: Better default choice for simple, single-session, thread-based applications
 
 Validate the real testnet examples and E2E runner with your own FIX key before using the async connector in production.
 

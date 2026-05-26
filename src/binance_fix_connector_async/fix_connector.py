@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Binance FIX Connector - High-Performance Async Implementation.
+Async Binance SPOT FIX connector for research and test workflows.
 
-This module provides async/await support for high-performance FIX protocol
-communication with Binance SPOT trading services.
+This module provides async/await support for FIX session experiments,
+testnet scripts, and local latency research.
 """
 
 from __future__ import annotations
@@ -374,8 +374,7 @@ class BinanceFixConnector:
     """
     Binance FIX Connector.
 
-    Provides async/await interfaces for FIX protocol communication
-    with high-performance asyncio-based message handling.
+    Provides async/await interfaces for Binance SPOT FIX sessions.
     """
 
     def __init__(

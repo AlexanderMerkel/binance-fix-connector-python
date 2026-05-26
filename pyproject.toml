@@ -3,10 +3,10 @@ requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "binance_fix_connector_async"
+name = "binance-fix-connector-async"
 version = "1.1.0"
-authors = [{name = "Binance"}]
-description = "Asyncio-native Python connector for Binance SPOT FIX testing, latency research, and feed/session comparison."
+authors = [{name = "Alexander Merkel"}]
+description = "Unofficial asyncio-native Python connector for Binance SPOT FIX testing, latency research, and feed/session comparison."
 readme = "README.md"
 requires-python = ">=3.13"
 classifiers = [
