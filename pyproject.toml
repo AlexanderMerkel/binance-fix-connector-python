@@ -21,7 +21,22 @@ dependencies = [
     "aiohttp>=3.8",
 ]
 license = "MIT"
-keywords = ["binance", "fix", "connector", "async", "trading"]
+keywords = [
+    "binance",
+    "binance-api",
+    "fix",
+    "fix-api",
+    "fix-protocol",
+    "asyncio",
+    "async-python",
+    "trading",
+    "spot-trading",
+    "cryptocurrency",
+    "market-data",
+    "order-entry",
+    "drop-copy",
+    "latency-research",
+]
 
 [project.urls]
 Homepage = "https://github.com/AlexanderMerkel/binance-fix-connector-python"
